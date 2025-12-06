@@ -18,13 +18,13 @@ export default function PaywallScreen() {
         <View style={{ flex: 1 }}>
             <RevenueCatUI.Paywall
                 onDismiss={() => router.back()}
-                onPurchaseCompleted={(customerInfo) => {
+                onPurchaseCompleted={({ customerInfo }) => {
                     const isNowPremium = customerInfo.entitlements.active['REDFLAG Pro'];
                     if (isNowPremium) {
                         router.back();
                     }
                 }}
-                onRestoreCompleted={(customerInfo) => {
+                onRestoreCompleted={({ customerInfo }) => {
                     const isNowPremium = customerInfo.entitlements.active['REDFLAG Pro'];
                     if (isNowPremium) {
                         Alert.alert("Purchases Restored", "Your subscription has been restored.");

@@ -52,7 +52,7 @@ export default function AudioRecorder({ onAnalysisTrigger, loading }: AudioRecor
     async function handleAnalyze() {
         if (!audioUri) return;
         try {
-            const base64 = await FileSystem.readAsStringAsync(audioUri, { encoding: FileSystem.EncodingType.Base64 });
+            const base64 = await FileSystem.readAsStringAsync(audioUri, { encoding: 'base64' });
             onAnalysisTrigger(base64);
         } catch (e) {
             Alert.alert("Error processing audio", "Could not prepare audio for analysis.");

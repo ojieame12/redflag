@@ -24,6 +24,7 @@ export interface AttachmentStyleAnalysis {
 }
 
 export interface AnalysisResult {
+    id?: string; // Optional ID from DB
     red_flags: RedFlag[];
     green_flags: GreenFlag[];
     toxicity: ToxicityAnalysis;

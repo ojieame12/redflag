@@ -175,7 +175,7 @@ export default function ResultScreen() {
     // Gradient colors based on score
     const score = data.toxicity.score;
     const isToxic = score > 6;
-    const gradientColors = isToxic
+    const gradientColors: [string, string] = isToxic
         ? ['#FF5A5F', '#C41E3A']
         : score > 3
             ? ['#FCD34D', '#F59E0B']
