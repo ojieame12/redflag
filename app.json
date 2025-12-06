@@ -7,9 +7,37 @@
       "output": "static"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you analyze screenshots of conversations.",
+          "cameraPermission": "The app uses your camera to let you take photos of text for analysis."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "The app needs access to your microphone to record audio for voice analysis."
+        }
+      ]
     ],
     "name": "redflag-mobile-app",
-    "slug": "redflag-mobile-app"
+    "slug": "redflag-mobile-app",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ojieame.redflag",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you analyze screenshots of conversations.",
+        "NSCameraUsageDescription": "The app uses your camera to let you take photos of text for analysis.",
+        "NSMicrophoneUsageDescription": "The app needs access to your microphone to record audio for voice analysis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FF5A5F"
+      },
+      "package": "com.ojieame.redflag"
+    }
   }
 }

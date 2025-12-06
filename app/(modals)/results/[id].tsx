@@ -1,5 +1,5 @@
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Share, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,19 +11,41 @@ import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from 'expo-sharing';
 import ShareCard from '@/components/analyze/ShareCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as StoreReview from 'expo-store-review';
 import { MotiView, MotiText } from 'moti';
 import { supabase } from '@/lib/supabase';
+import BottomSheet from '@gorhom/bottom-sheet';
+import ShareSheet from '@/components/files/ShareSheet';
 
 export default function ResultScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { id } = params;
 
+
+
     const viewShotRef = useRef(null);
+    const shareSheetRef = useRef<BottomSheet>(null);
     const [sharing, setSharing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSaved, setIsSaved] = useState(false);
     const [data, setData] = useState<AnalysisResult | null>(null);
+
+    // Prompt for review if result is good and user is happy
+    useEffect(() => {
+        if (!loading && data) {
+            const isGoodResult = data.toxicity.score < 4;
+            if (isGoodResult) {
+                // Delay slightly to let them read the good news
+                const timer = setTimeout(async () => {
+                    if (await StoreReview.hasAction()) {
+                        StoreReview.requestReview();
+                    }
+                }, 2000);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [loading, data]);
 
     // Load Data (either from params or DB)
     useEffect(() => {
@@ -107,7 +129,11 @@ export default function ResultScreen() {
         }
     };
 
-    const handleShare = async () => {
+    const handleSharePress = () => {
+        shareSheetRef.current?.expand();
+    };
+
+    const handleSystemShare = async () => {
         try {
             setSharing(true);
             const uri = await captureRef(viewShotRef, {
@@ -186,7 +212,7 @@ export default function ResultScreen() {
                                     <Save color={isSaved ? '#2563EB' : '#222'} size={20} />
                                 </TouchableOpacity>
                             )}
-                            <TouchableOpacity onPress={handleShare} className="bg-gray-50 p-2 rounded-full">
+                            <TouchableOpacity onPress={handleSharePress} className="bg-gray-50 p-2 rounded-full">
                                 <Share2 color="#222" size={20} />
                             </TouchableOpacity>
                         </View>
@@ -330,6 +356,11 @@ export default function ResultScreen() {
                     </View>
                 </ScrollView>
             </View>
+            <ShareSheet
+                ref={shareSheetRef}
+                contentToShare="Check out RedFlag! https://redflag.app"
+                onClose={() => shareSheetRef.current?.close()}
+            />
         </SafeAreaView>
     );
 }

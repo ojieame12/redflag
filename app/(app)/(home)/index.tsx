@@ -1,4 +1,4 @@
-```
+
 import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ export default function HomeScreen() {
         <SafeAreaView className="flex-1 bg-white">
             <ScrollView className="px-6 py-8" showsVerticalScrollIndicator={false}>
                 {/* Header */}
-                <MotiView 
+                <MotiView
                     from={{ opacity: 0, translateY: -20 }}
                     animate={{ opacity: 1, translateY: 0 }}
                     transition={{ type: 'timing', duration: 700 }}
@@ -35,11 +35,11 @@ export default function HomeScreen() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ type: 'spring', delay: 200 }}
                 >
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         activeOpacity={0.9}
                         onPress={() => router.push('/analyze')}
                     >
-                         <LinearGradient
+                        <LinearGradient
                             colors={['#FF5A5F', '#FF385C']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
@@ -67,7 +67,7 @@ export default function HomeScreen() {
                     animate={{ opacity: 1, translateY: 0 }}
                     transition={{ type: 'timing', delay: 400 }}
                 >
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => router.push('/quiz')}
                         activeOpacity={0.8}
                         className="mb-8 bg-blue-50 p-6 rounded-3xl border border-blue-100 flex-row items-center justify-between"

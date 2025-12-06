@@ -4,6 +4,11 @@ import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { View } from 'react-native';
 import "../global.css";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Toast from 'react-native-toast-message';
+
+const queryClient = new QueryClient();
 
 function InitialLayout() {
     const { session, isLoading } = useAuth();
@@ -29,8 +34,13 @@ function InitialLayout() {
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
-            <InitialLayout />
-        </AuthProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <QueryClientProvider client={queryClient}>
+                <AuthProvider>
+                    <InitialLayout />
+                    <Toast />
+                </AuthProvider>
+            </QueryClientProvider>
+        </GestureHandlerRootView>
     );
 }

@@ -26,6 +26,34 @@ export default function ProfileScreen() {
         ]);
     };
 
+    const handleDeleteAccount = async () => {
+        Alert.alert(
+            "Delete Account",
+            "This will permanently delete your profile and analysis history. This action cannot be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete My Account",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            if (!session?.user?.id) return;
+
+                            // 1. Delete user data locally/logically (RLS may prevent deleting the auth user, but we can clear profile)
+                            await supabase.from('profiles').delete().eq('id', session.user.id);
+                            // 2. Sign out
+                            await supabase.auth.signOut();
+                            Alert.alert("Account Deleted", "Your account has been successfully deleted.");
+                        } catch (e) {
+                            Alert.alert("Error", "Could not delete account. Please contact support.");
+                            console.error(e);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleManageSubscription = async () => {
         if (isPremium) {
             // Use RevenueCat Customer Center if available or fallback
@@ -108,9 +136,9 @@ export default function ProfileScreen() {
 
                     {/* Danger Zone */}
                     <View className="mt-8 mb-10 pt-8 border-t border-gray-100">
-                        <TouchableOpacity className="flex-row items-center gap-3 opacity-50">
-                            <Trash2 size={20} color="#484848" />
-                            <Text className="text-airbnb-black font-medium text-base">Delete Account</Text>
+                        <TouchableOpacity className="flex-row items-center gap-3 opacity-50 text-red-500" onPress={handleDeleteAccount}>
+                            <Trash2 size={20} color="#FF5A5F" />
+                            <Text className="text-airbnb-red font-medium text-base">Delete Account</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

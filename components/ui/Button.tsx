@@ -10,6 +10,8 @@ interface ButtonProps extends TouchableOpacityProps {
     className?: string;
 }
 
+import * as Haptics from 'expo-haptics';
+
 export function Button({
     variant = 'primary',
     size = 'md',
@@ -17,6 +19,7 @@ export function Button({
     loading,
     className,
     disabled,
+    onPress,
     ...props
 }: ButtonProps) {
 
@@ -42,6 +45,13 @@ export function Button({
         ghost: "text-gray-900 font-medium",
     };
 
+    const handlePress = async (e: any) => {
+        if (process.env.EXPO_OS !== 'web') {
+            await Haptics.selectionAsync();
+        }
+        onPress?.(e);
+    };
+
     return (
         <TouchableOpacity
             className={twMerge(
@@ -52,6 +62,7 @@ export function Button({
                 className
             )}
             disabled={disabled || loading}
+            onPress={handlePress}
             {...props}
         >
             {loading ? (
