@@ -9,7 +9,7 @@
     "plugins": [
       "expo-router"
     ],
-    "name": "airbnb-clone",
-    "slug": "airbnb-clone"
+    "name": "redflag-mobile-app",
+    "slug": "redflag-mobile-app"
   }
 }
