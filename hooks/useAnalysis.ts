@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
@@ -5,12 +6,14 @@ import { analyzeConversation } from '@/lib/gemini';
 import { AnalysisResult } from '@/types/analysis';
 import { useRouter } from 'expo-router';
 import { useUsage } from './useUsage';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export function useAnalysis() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<AnalysisResult | null>(null);
     const { hasAccess, incrementUsage } = useUsage();
+    const { session } = useAuth();
 
     const checkAccess = () => {
         if (!hasAccess) {
@@ -64,18 +67,55 @@ export function useAnalysis() {
         }
     };
 
-    const handleAnalysis = async (input: string, type: 'image' | 'text' | 'audio') => {
+    const handleAnalysis = async (input: string, inputType: 'image' | 'text' | 'audio') => {
         setLoading(true);
         try {
-            const data = await analyzeConversation(input, type);
-            setResult(data);
+            // 1. Get Analysis from Gemini
+            const data = await analyzeConversation(input, inputType);
+
+            // 2. Increment Usage Limit
             await incrementUsage();
 
+            // 3. Save to Supabase (if user is logged in)
+            let analysisId = 'latest';
+            if (session?.user) {
+                const { data: insertedData, error } = await supabase
+                    .from('analyses')
+                    .insert({
+                        user_id: session.user.id,
+                        input_type: 'screenshot', // simplified for now, or map 'image' -> 'screenshot'
+                        red_flags: data.red_flags,
+                        green_flags: data.green_flags,
+                        toxicity_score: data.toxicity.score,
+                        toxicity_verdict: data.toxicity.verdict,
+                        toxicity_summary: data.toxicity.summary,
+                        attachment_style: data.attachment_style.primary,
+                        attachment_explanation: data.attachment_style.explanation,
+                        is_saved: false // Not "Receipts" yet, just history
+                    })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error("Failed to save analysis:", error);
+                    // We continue anyway so the user sees the result
+                } else if (insertedData) {
+                    analysisId = insertedData.id;
+                }
+            }
+
+            // 4. Navigate to Results
             router.push({
                 pathname: "/results/[id]",
-                params: { id: 'latest', data: JSON.stringify(data) }
+                params: {
+                    id: analysisId,
+                    // Pass data as fallback so we don't have to fetch immediately if we just have it
+                    data: JSON.stringify(data)
+                }
             });
+
         } catch (error) {
+            console.error(error);
             Alert.alert("Analysis Failed", "Could not analyze the conversation. Please try again.");
         } finally {
             setLoading(false);
@@ -86,7 +126,6 @@ export function useAnalysis() {
         pickImage,
         analyzeText,
         analyzeAudio,
-        loading,
-        result
+        loading
     };
 }

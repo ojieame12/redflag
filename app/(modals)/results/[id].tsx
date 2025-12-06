@@ -1,42 +1,111 @@
+
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Share, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Share2, AlertTriangle, CheckCircle, HelpCircle } from 'lucide-react-native';
+import { ArrowLeft, Share2, AlertTriangle, CheckCircle, HelpCircle, Save } from 'lucide-react-native';
 import { AnalysisResult } from '@/types/analysis';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { clsx } from 'clsx';
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from 'expo-sharing';
 import ShareCard from '@/components/analyze/ShareCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView, MotiText } from 'moti';
+import { supabase } from '@/lib/supabase';
 
 export default function ResultScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const { id } = params;
+
     const viewShotRef = useRef(null);
     const [sharing, setSharing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [isSaved, setIsSaved] = useState(false);
+    const [data, setData] = useState<AnalysisResult | null>(null);
 
-    // Safe parsing of the result
-    let data: AnalysisResult | null = null;
-    try {
-        if (typeof params.data === 'string') {
-            data = JSON.parse(params.data);
+    // Load Data (either from params or DB)
+    useEffect(() => {
+        loadData();
+    }, [id]);
+
+    const loadData = async () => {
+        try {
+            // 1. Try params first (fastest)
+            if (typeof params.data === 'string') {
+                const parsed = JSON.parse(params.data);
+                setData(parsed);
+                setLoading(false);
+
+                // If we also have an ID, check if it's saved
+                if (id && id !== 'latest') {
+                    checkIfSaved(id as string);
+                }
+                return;
+            }
+
+            // 2. Fetch from DB if no params
+            if (id && id !== 'latest') {
+                const { data: dbData, error } = await supabase
+                    .from('analyses')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error || !dbData) throw error;
+
+                // Transform DB row back to AnalysisResult shape
+                const result: AnalysisResult = {
+                    red_flags: dbData.red_flags,
+                    green_flags: dbData.green_flags,
+                    toxicity: {
+                        score: dbData.toxicity_score,
+                        verdict: dbData.toxicity_verdict as any,
+                        summary: dbData.toxicity_summary
+                    },
+                    attachment_style: {
+                        primary: dbData.attachment_style as any,
+                        confidence: 'medium', // Stored simplified
+                        explanation: dbData.attachment_explanation,
+                        indicators: [] // Stored simplified
+                    }
+                };
+
+                setData(result);
+                setIsSaved(dbData.is_saved);
+            }
+        } catch (e) {
+            console.error("Failed to load result", e);
+        } finally {
+            setLoading(false);
         }
-    } catch (e) {
-        console.error("Failed to parse result data");
-    }
+    };
 
-    if (!data) {
-        return (
-            <SafeAreaView className="flex-1 justify-center items-center">
-                <Text>Error loading results.</Text>
-                <Button label="Go Back" onPress={() => router.back()} className="mt-4" />
-            </SafeAreaView>
-        );
-    }
+    const checkIfSaved = async (analysisId: string) => {
+        const { data } = await supabase.from('analyses').select('is_saved').eq('id', analysisId).single();
+        if (data) setIsSaved(data.is_saved);
+    };
+
+    const handleSaveReceipt = async () => {
+        if (!id || id === 'latest') {
+            Alert.alert("Error", "Cannot save this analysis.");
+            return;
+        }
+
+        const newStatus = !isSaved;
+        setIsSaved(newStatus); // Optimistic
+
+        const { error } = await supabase
+            .from('analyses')
+            .update({ is_saved: newStatus })
+            .eq('id', id);
+
+        if (error) {
+            setIsSaved(!newStatus); // Revert
+            Alert.alert("Error", "Failed to update receipt status.");
+        }
+    };
 
     const handleShare = async () => {
         try {
@@ -58,18 +127,28 @@ export default function ResultScreen() {
         }
     };
 
-    const getScoreColor = (score: number) => {
-        if (score <= 3) return "text-green-600";
-        if (score <= 6) return "text-yellow-600";
-        return "text-red-600";
-    };
+    if (loading) {
+        return (
+            <SafeAreaView className="flex-1 justify-center items-center bg-white">
+                <ActivityIndicator size="large" color="#FF5A5F" />
+                <Text className="text-gray-400 mt-4">Loading investigation...</Text>
+            </SafeAreaView>
+        );
+    }
 
-    const ScoreIcon = data.toxicity.score > 6 ? AlertTriangle : (data.toxicity.score > 3 ? HelpCircle : CheckCircle);
-    const scoreColorClass = getScoreColor(data.toxicity.score);
+    if (!data) {
+        return (
+            <SafeAreaView className="flex-1 justify-center items-center">
+                <Text>Error loading results.</Text>
+                <Button label="Go Back" onPress={() => router.back()} className="mt-4" />
+            </SafeAreaView>
+        );
+    }
+
+    // ... (Remainder of UI logic is strictly presentation)
+    // Gradient colors based on score
     const score = data.toxicity.score;
     const isToxic = score > 6;
-
-    // Gradient colors based on score
     const gradientColors = isToxic
         ? ['#FF5A5F', '#C41E3A']
         : score > 3
@@ -79,7 +158,7 @@ export default function ResultScreen() {
     return (
         <SafeAreaView className="flex-1 bg-white">
             <View className="flex-1 relative">
-                {/* Share Card Capture View */}
+                {/* Share Card Capture View (Hidden offscreen) */}
                 <View style={{ position: 'absolute', top: 10000, left: 0 }}>
                     <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }}>
                         <ShareCard
@@ -97,10 +176,20 @@ export default function ResultScreen() {
                         <TouchableOpacity onPress={() => router.replace('/')} className="bg-gray-50 p-2 rounded-full">
                             <ArrowLeft color="#222" size={20} />
                         </TouchableOpacity>
-                        <Text className="font-bold text-lg text-airbnb-black">Investigation Results</Text>
-                        <TouchableOpacity onPress={handleShare} className="bg-gray-50 p-2 rounded-full">
-                            <Share2 color="#222" size={20} />
-                        </TouchableOpacity>
+
+                        <View className="flex-row gap-2">
+                            {id && id !== 'latest' && (
+                                <TouchableOpacity
+                                    onPress={handleSaveReceipt}
+                                    className={`p-2 rounded-full ${isSaved ? 'bg-blue-100' : 'bg-gray-50'}`}
+                                >
+                                    <Save color={isSaved ? '#2563EB' : '#222'} size={20} />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={handleShare} className="bg-gray-50 p-2 rounded-full">
+                                <Share2 color="#222" size={20} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View className="p-6 gap-6 pb-20">
@@ -118,8 +207,6 @@ export default function ResultScreen() {
                                     colors={gradientColors}
                                     style={{ padding: 32, borderRadius: 24, alignItems: 'center' }}
                                 >
-                                    <Text className="text-white/80 uppercase text-xs font-bold tracking-[0.2em] mb-4">Toxicity Score</Text>
-
                                     <View className="flex-row items-baseline mb-6">
                                         <MotiText
                                             from={{ opacity: 0, translateY: 10 }}
@@ -219,13 +306,15 @@ export default function ResultScreen() {
                                     <Text className="font-black text-blue-900 text-xl mb-2 capitalize tracking-tight">
                                         {data.attachment_style.primary.replace('_', ' ')}
                                     </Text>
-                                    <View className="flex-row gap-2 mb-4 flex-wrap">
-                                        {data.attachment_style.indicators.map((tag, i) => (
-                                            <View key={i} className="bg-white/60 px-2 py-1 rounded text-xs">
-                                                <Text className="text-blue-700 text-xs font-medium">{tag}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
+                                    {data.attachment_style.indicators && (
+                                        <View className="flex-row gap-2 mb-4 flex-wrap">
+                                            {data.attachment_style.indicators.map((tag, i) => (
+                                                <View key={i} className="bg-white/60 px-2 py-1 rounded text-xs">
+                                                    <Text className="text-blue-700 text-xs font-medium">{tag}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
                                     <Text className="text-blue-900/80 leading-6 font-medium">
                                         {data.attachment_style.explanation}
                                     </Text>
@@ -234,9 +323,8 @@ export default function ResultScreen() {
                         </View>
 
                         <Button
-                            label={sharing ? "Preparing Image..." : "Analyze Another"}
+                            label="Analyze Another"
                             onPress={() => router.push('/analyze')}
-                            disabled={sharing}
                             className="mt-8 shadow-lg shadow-gray-200"
                         />
                     </View>

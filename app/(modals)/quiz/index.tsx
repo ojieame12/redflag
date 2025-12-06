@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -8,9 +9,12 @@ import { QUIZ_QUESTIONS, calculateResult } from '@/data/quiz';
 import { clsx } from 'clsx';
 import * as SecureStore from 'expo-secure-store';
 import { MotiView } from 'moti';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function QuizScreen() {
     const router = useRouter();
+    const { session } = useAuth();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<('secure' | 'anxious' | 'dismissive' | 'fearful')[]>([]);
 
@@ -30,7 +34,34 @@ export default function QuizScreen() {
 
     const finishQuiz = async (finalAnswers: any[]) => {
         const result = calculateResult(finalAnswers);
+
+        // Save locally
         await SecureStore.setItemAsync('attachment_style', result);
+
+        // Save to Supabase if logged in
+        if (session?.user) {
+            try {
+                // Map answers to simple object {0: 'secure', 1: 'anxious', ...}
+                // or just store the array. The schema has JSONB for responses.
+                const responsesJson = finalAnswers.reduce((acc, ans, idx) => ({ ...acc, [idx]: ans }), {});
+
+                await supabase.from('quiz_responses').insert({
+                    user_id: session.user.id,
+                    result: result,
+                    responses: responsesJson
+                });
+
+                // Also update profile for easy access
+                await supabase.from('profiles').update({
+                    attachment_style: result,
+                    quiz_completed_at: new Date().toISOString()
+                }).eq('id', session.user.id);
+
+            } catch (e) {
+                console.error("Failed to save quiz to DB", e);
+            }
+        }
+
         router.replace({
             pathname: "/quiz/result",
             params: { style: result }
